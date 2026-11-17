@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+bus=user
+prefix=""
+while (($#)); do
+  case "$1" in
+    --user) bus=user; shift ;;
+    --system) bus=system; shift ;;
+    --prefix) [[ $# -ge 2 ]] || { echo "--prefix requires a value" >&2; exit 2; }; prefix=$2; shift 2 ;;
+    -h|--help) echo "Usage: dbus-name-inspector [--user|--system] [--prefix NAME]"; exit 0 ;;
+    *) echo "Unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+command -v busctl >/dev/null 2>&1 || { echo "busctl is required (systemd D-Bus tools)" >&2; exit 2; }
+if [[ $bus == system ]]; then args=(--system); else args=(--user); fi
+printf 'NAME\tPID\tPROCESS\tUSER\n'
+busctl "${args[@]}" --no-pager list --no-legend | while read -r name pid process user connection unit session description; do
+  [[ -n ${name:-} ]] || continue
+  [[ -z $prefix || $name == "$prefix"* ]] || continue
+  printf '%s\t%s\t%s\t%s\n' "$name" "${pid:--}" "${process:--}" "${user:--}"
+done
